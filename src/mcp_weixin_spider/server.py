@@ -28,10 +28,6 @@ except ImportError:
     print("FastMCP不可用，请使用标准server.py")
     sys.exit(1)
 
-# 添加项目根目录到Python路径
-project_root = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
-sys.path.append(project_root)
-
 # 配置日志
 logging.basicConfig(
     level=getattr(logging, config.log.level),
@@ -45,92 +41,174 @@ app = FastMCP(config.mcp.server_name)
 
 # 导入爬虫模块
 try:
-    # 使用简化版爬虫
-    from weixin_spider_simple import WeixinSpiderWithImages
-    logger.info("使用简化版爬虫模块")
+    from .spider import WeixinSpiderWithImages
+    logger.info("使用重构后的爬虫模块")
 except ImportError as e:
-    logger.error(f"导入简化版爬虫模块失败: {e}")
+    logger.error(f"导入爬虫模块失败: {e}")
     sys.exit(1)
 
 
-class SpiderSingleton:
-    """爬虫单例管理类，线程安全"""
+class BrowserPool:
+    """浏览器池管理类，线程安全"""
     
-    _instance: Optional[WeixinSpiderWithImages] = None
-    _lock = threading.Lock()
+    def __init__(self, max_size: int = 5):
+        self._pool: list[WeixinSpiderWithImages] = []
+        self._max_size = max_size
+        self._lock = threading.Lock()
+        self._initialized = False
     
-    @classmethod
-    def get_instance(cls) -> WeixinSpiderWithImages:
-        """获取爬虫实例，线程安全"""
-        if cls._instance is None or cls._instance.driver is None:
-            with cls._lock:
-                if cls._instance is None or cls._instance.driver is None:
-                    if cls._instance and cls._instance.driver is None:
-                        logger.warning("检测到驱动已失效，重新初始化...")
-                        try:
-                            cls._instance.setup_driver(headless=config.spider.headless)
-                            logger.info("驱动重新初始化成功")
-                        except Exception as e:
-                            logger.error(f"驱动重新初始化失败: {e}")
-                            cls._instance = None
-                    
-                    if cls._instance is None:
-                        try:
-                            cls._instance = WeixinSpiderWithImages(
-                                headless=config.spider.headless,
-                                wait_time=config.spider.wait_time,
-                                download_images=config.spider.download_images
-                            )
-                            logger.info("爬虫实例初始化成功")
-                        except Exception as e:
-                            logger.error(f"爬虫实例初始化失败: {e}")
-                            raise RuntimeError(f"无法初始化爬虫实例: {e}")
-        return cls._instance
-    
-    @classmethod
-    def close_instance(cls):
-        """关闭爬虫实例"""
-        with cls._lock:
-            if cls._instance:
+    def _initialize(self):
+        """初始化浏览器池"""
+        with self._lock:
+            if self._initialized:
+                return
+            
+            logger.info(f"初始化浏览器池，最大实例数: {self._max_size}")
+            for i in range(self._max_size):
                 try:
-                    cls._instance.close()
-                    logger.info("爬虫实例已关闭")
+                    spider = WeixinSpiderWithImages(
+                        headless=config.spider.headless,
+                        wait_time=config.spider.wait_time,
+                        download_images=config.spider.download_images,
+                        browser=config.spider.browser
+                    )
+                    self._pool.append(spider)
+                    logger.info(f"浏览器实例 {i+1}/{self._max_size} 初始化成功")
                 except Exception as e:
-                    logger.error(f"关闭爬虫实例时出错: {e}")
-                finally:
-                    cls._instance = None
+                    logger.error(f"浏览器实例 {i+1}/{self._max_size} 初始化失败: {e}")
+            
+            self._initialized = True
+    
+    def get_browser(self) -> WeixinSpiderWithImages:
+        """从池中获取浏览器实例"""
+        with self._lock:
+            # 初始化浏览器池（延迟初始化）
+            if not self._initialized:
+                self._initialize()
+            
+            if not self._pool:
+                # 池为空，创建临时实例
+                logger.warning("浏览器池为空，创建临时实例")
+                return WeixinSpiderWithImages(
+                    headless=config.spider.headless,
+                    wait_time=config.spider.wait_time,
+                    download_images=config.spider.download_images,
+                    browser=config.spider.browser
+                )
+            
+            # 从池中获取最后一个实例（栈式管理）
+            return self._pool.pop()
+    
+    def return_browser(self, spider: WeixinSpiderWithImages):
+        """将浏览器实例归还到池中"""
+        with self._lock:
+            if len(self._pool) < self._max_size:
+                # 检查浏览器实例是否可用
+                if spider and spider.driver:
+                    try:
+                        # 重置浏览器状态
+                        spider.driver.delete_all_cookies()
+                        spider.driver.execute_script("window.localStorage.clear();")
+                        spider.driver.execute_script("window.sessionStorage.clear();")
+                        spider.driver.get("about:blank")
+                        
+                        self._pool.append(spider)
+                        logger.debug("浏览器实例已归还到池中")
+                    except Exception as e:
+                        logger.error(f"重置浏览器实例时出错: {e}")
+                        # 关闭损坏的实例
+                        try:
+                            spider.close()
+                        except Exception:
+                            pass
+                else:
+                    # 实例已不可用，关闭并丢弃
+                    try:
+                        spider.close()
+                    except Exception:
+                        pass
+            else:
+                # 池已满，关闭实例
+                try:
+                    spider.close()
+                    logger.debug("浏览器池已满，关闭多余实例")
+                except Exception:
+                    pass
+    
+    def close_all(self):
+        """关闭所有浏览器实例"""
+        with self._lock:
+            for spider in self._pool:
+                try:
+                    spider.close()
+                except Exception as e:
+                    logger.error(f"关闭浏览器实例时出错: {e}")
+            self._pool.clear()
+            self._initialized = False
+            logger.info("所有浏览器实例已关闭")
 
+
+from collections import OrderedDict
+from datetime import datetime, timedelta
 
 class ArticleCache:
-    """文章缓存管理类"""
+    """优化后的文章缓存管理类，支持LRU淘汰和过期时间"""
     
-    def __init__(self, max_size: int = 100):
-        self._cache: Dict[str, Dict[str, Any]] = {}
+    def __init__(self, max_size: int = 100, expire_time: int = 3600):
+        self._cache: OrderedDict[str, Dict[str, Any]] = OrderedDict()
+        self._cache_time: Dict[str, datetime] = {}  # 缓存创建时间
         self._max_size = max_size
+        self._expire_time = expire_time  # 缓存过期时间（秒）
         self._lock = threading.Lock()
     
     def get(self, url: str) -> Optional[Dict[str, Any]]:
-        """获取缓存的文章"""
+        """获取缓存的文章，检查过期时间"""
         with self._lock:
-            return self._cache.get(url)
+            if url not in self._cache:
+                return None
+            
+            # 检查过期时间
+            cache_time = self._cache_time[url]
+            if datetime.now() - cache_time > timedelta(seconds=self._expire_time):
+                del self._cache[url]
+                del self._cache_time[url]
+                return None
+            
+            # 移动到末尾表示最近使用
+            self._cache.move_to_end(url)
+            return self._cache[url]
     
     def set(self, url: str, data: Dict[str, Any]):
         """设置缓存的文章"""
         with self._lock:
-            if len(self._cache) >= self._max_size:
-                # 移除最旧的缓存
-                oldest_key = next(iter(self._cache))
-                del self._cache[oldest_key]
-            self._cache[url] = data
+            if url in self._cache:
+                # 更新缓存
+                self._cache[url] = data
+                self._cache.move_to_end(url)
+            else:
+                # 检查缓存大小
+                if len(self._cache) >= self._max_size:
+                    # 移除最旧的缓存
+                    oldest_key = next(iter(self._cache))
+                    del self._cache[oldest_key]
+                    del self._cache_time[oldest_key]
+                
+                # 添加新缓存
+                self._cache[url] = data
+                self._cache_time[url] = datetime.now()
     
     def clear(self):
         """清空缓存"""
         with self._lock:
             self._cache.clear()
+            self._cache_time.clear()
 
+
+# 初始化浏览器池
+spider_pool = BrowserPool(max_size=5)  # 最大5个浏览器实例
 
 # 初始化文章缓存
-article_cache = ArticleCache(max_size=100)
+article_cache = ArticleCache(max_size=100, expire_time=3600)  # 缓存100条，过期时间1小时
 
 
 def create_json_response(data: Dict, ensure_ascii: bool = False, indent: int = 2) -> str:
@@ -151,53 +229,60 @@ def crawl_weixin_article(url: str, download_images: bool = True, custom_filename
     Returns:
         爬取结果的JSON字符串
     """
+    # 导入自定义异常类
+    from .exceptions import InvalidURLError, CrawlFailedError
+    
+    # 验证URL
+    if not url or not isinstance(url, str) or not url.startswith("https://mp.weixin.qq.com/"):
+        raise InvalidURLError(url, "必须是有效的微信文章URL，以 https://mp.weixin.qq.com/ 开头")
+    
+    logger.info(f"开始爬取文章: {url}")
+    
+    # 检查缓存
+    cached_data = article_cache.get(url)
+    if cached_data and not download_images:  # 只有当不需要下载图片时才使用缓存
+        logger.info(f"使用缓存的文章数据: {url}")
+        return create_json_response({
+            "status": "success",
+            "message": "从缓存获取文章成功",
+            "article": cached_data["article"],
+            "files_saved": {
+                "json": True,
+                "txt": True,
+                "images": False
+            }
+        })
+    
+    # 从浏览器池获取爬虫实例
+    spider = None
     try:
-        # 验证URL
-        if not url or not isinstance(url, str) or not url.startswith("https://mp.weixin.qq.com/"):
-            raise ValueError("无效的微信文章URL，必须以 https://mp.weixin.qq.com/ 开头")
+        # 获取浏览器实例
+        spider = spider_pool.get_browser()
         
-        logger.info(f"开始爬取文章: {url}")
-        
-        # 检查缓存
-        cached_data = article_cache.get(url)
-        if cached_data and not download_images:  # 只有当不需要下载图片时才使用缓存
-            logger.info(f"使用缓存的文章数据: {url}")
-            return create_json_response({
-                "status": "success",
-                "message": "从缓存获取文章成功",
-                "article": cached_data["article"],
-                "files_saved": {
-                    "json": True,
-                    "txt": True,
-                    "images": False
-                }
-            })
-        
-        # 获取爬虫实例并设置参数
-        spider = SpiderSingleton.get_instance()
+        # 设置参数
         spider.download_images = download_images
         
         # 爬取文章
         article_data = spider.crawl_article_by_url(url)
         if not article_data:
-            raise RuntimeError("无法获取文章内容")
+            raise CrawlFailedError(url, "无法获取文章内容")
         
         # 保存文章到文件
         if not spider.save_article_to_file(article_data, custom_filename):
-            raise RuntimeError("保存文件时出错")
+            raise CrawlFailedError(url, "保存文件时出错")
         
         # 构建返回结果
         result = {
             "status": "success",
             "message": "文章爬取成功",
             "article": {
-                "title": article_data.get("title", ""),
-                "author": article_data.get("author", ""),
-                "publish_time": article_data.get("publish_time", ""),
-                "url": article_data.get("url", ""),
-                "content_length": len(article_data.get("content", "")),
-                "images_count": len(article_data.get("images", [])),
-                "crawl_time": article_data.get("crawl_time", "")
+                "title": article_data.title,
+                "author": article_data.author,
+                "publish_time": article_data.publish_time,
+                "url": article_data.url,
+                "content_length": len(article_data.content),
+                "images_count": len(article_data.images),
+                "crawl_time": article_data.crawl_time
             },
             "files_saved": {
                 "json": True,
@@ -207,40 +292,48 @@ def crawl_weixin_article(url: str, download_images: bool = True, custom_filename
         }
         
         if download_images:
-            images = article_data.get("images", [])
-            success_count = sum(1 for img in images if img.get("download_success", False))
+            images = article_data.images
+            success_count = sum(1 for img in images if img.download_success)
             result["article"]["images_downloaded"] = f"{success_count}/{len(images)}"
         
         # 缓存文章数据（不包含图片信息）
         cache_data = {
             "article": result["article"],
-            "crawl_time": article_data.get("crawl_time", "")
+            "crawl_time": article_data.crawl_time
         }
         article_cache.set(url, cache_data)
         
         return create_json_response(result)
         
-    except ValueError as e:
-        logger.error(f"参数错误: {e}")
+    except InvalidURLError as e:
+        logger.error(f"URL验证失败: {e}")
         return create_json_response({
             "status": "error",
-            "message": f"参数错误: {str(e)}",
+            "code": "INVALID_URL",
+            "message": str(e),
             "url": url
         })
-    except RuntimeError as e:
+    except CrawlFailedError as e:
         logger.error(f"爬取失败: {e}")
         return create_json_response({
             "status": "error",
-            "message": f"爬取失败: {str(e)}",
-            "url": url
+            "code": "CRAWL_FAILED",
+            "message": str(e),
+            "url": url,
+            "attempt": getattr(e, "attempt", 1)
         })
     except Exception as e:
         logger.error(f"爬取文章时发生意外错误: {e}", exc_info=True)
         return create_json_response({
             "status": "error",
-            "message": f"爬取失败: {str(e)}",
+            "code": "INTERNAL_ERROR",
+            "message": f"内部错误: {str(e)}",
             "url": url
         })
+    finally:
+        # 将浏览器实例归还到池中
+        if spider:
+            spider_pool.return_browser(spider)
 
 
 @app.tool()
@@ -397,7 +490,7 @@ def clear_article_cache() -> str:
 def cleanup():
     """清理资源"""
     logger.info("正在清理资源...")
-    SpiderSingleton.close_instance()
+    spider_pool.close_all()
     article_cache.clear()
     logger.info("资源清理完成")
 
@@ -407,14 +500,6 @@ def main():
     try:
         logger.info("启动MCP微信爬虫服务器 (FastMCP版本)")
         logger.info(f"配置信息: 无头模式={config.spider.headless}, 等待时间={config.spider.wait_time}秒")
-        
-        # 预热爬虫实例
-        try:
-            SpiderSingleton.get_instance()
-            logger.info("爬虫实例预热完成")
-        except Exception as e:
-            logger.error(f"爬虫实例预热失败: {e}")
-            return
         
         logger.info("MCP微信爬虫服务器启动")
         app.run(transport=config.mcp.transport)

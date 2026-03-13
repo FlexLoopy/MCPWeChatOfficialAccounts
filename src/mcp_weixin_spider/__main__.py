@@ -40,7 +40,7 @@ def main():
         # 默认启动MCP服务器
         print("🚀 启动MCP微信爬虫服务器 (默认模式)")
         print("💡 提示: 使用 python3 -m mcp_weixin_spider client 启动交互式客户端")
-        from server import main as server_main
+        from .server import main as server_main
         server_main()
 
 if __name__ == "__main__":

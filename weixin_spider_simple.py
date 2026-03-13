@@ -12,9 +12,12 @@ from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
-from selenium.webdriver.chrome.options import Options
-from selenium.webdriver.chrome.service import Service
+from selenium.webdriver.chrome.options import Options as ChromeOptions
+from selenium.webdriver.chrome.service import Service as ChromeService
 from webdriver_manager.chrome import ChromeDriverManager
+from selenium.webdriver.edge.options import Options as EdgeOptions
+from selenium.webdriver.edge.service import Service as EdgeService
+from webdriver_manager.microsoft import EdgeChromiumDriverManager
 from bs4 import BeautifulSoup
 import json
 import os
@@ -30,6 +33,8 @@ import subprocess
 import base64
 from urllib.parse import unquote
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from dataclasses import dataclass, field, asdict
+from typing import List, Optional
 
 # 配置日志
 logging.basicConfig(
@@ -38,26 +43,55 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+
+@dataclass
+class ImageInfo:
+    """图片信息数据类"""
+    index: int
+    url: str
+    alt: str
+    title: str = ""
+    filename: Optional[str] = None
+    local_path: Optional[str] = None
+    download_success: bool = False
+
+
+@dataclass
+class ArticleData:
+    """文章数据类"""
+    title: str
+    author: str
+    publish_time: str
+    content_html: str
+    content: str
+    url: str
+    crawl_time: str
+    images: List[ImageInfo] = field(default_factory=list)
+
+
+@dataclass
 class WeixinSpiderWithImages:
+    """微信公众号文章爬虫类，支持多浏览器和图片下载"""
     # 类级别锁，避免在初始化完成前被调用
     _chrome_driver_lock = threading.Lock()
     
-    def __init__(self, headless=True, wait_time=10, download_images=True, max_workers=4):
-        """
-        初始化爬虫
-        :param headless: 是否使用无头模式
-        :param wait_time: 页面等待时间
-        :param download_images: 是否下载图片
-        :param max_workers: 图片下载线程数
-        """
-        self.driver = None
-        self.wait_time = wait_time
-        self.download_images = download_images
-        self.session = requests.Session()
-        self.max_workers = max_workers
-        self._chrome_driver_path = None
+    # 初始化参数
+    headless: bool = True
+    wait_time: int = 10
+    download_images: bool = True
+    max_workers: int = 4
+    browser: str = 'chrome'
+    
+    # 实例变量
+    driver: Optional[webdriver.Chrome] = field(default=None, init=False)
+    session: requests.Session = field(default_factory=requests.Session, init=False)
+    _chrome_driver_path: Optional[str] = field(default=None, init=False)
+    
+    def __post_init__(self):
+        """执行复杂的初始化逻辑"""
+        self.browser = self.browser.lower()
         self.setup_session()
-        self.setup_driver(headless)
+        self.setup_driver(self.headless)
         
     def setup_session(self):
         """设置requests会话，优化请求头和连接池"""
@@ -97,14 +131,23 @@ class WeixinSpiderWithImages:
             return None
         
     def setup_driver(self, headless=True):
-        """设置Chrome浏览器驱动，优化启动参数"""
+        """设置浏览器驱动，优化启动参数"""
         try:
-            logger.info("正在设置Chrome浏览器驱动...")
+            logger.info(f"正在设置{self.browser}浏览器驱动...")
             
-            options = Options()
+            # 创建浏览器选项
+            if self.browser == 'chrome':
+                options = ChromeOptions()
+            elif self.browser == 'edge':
+                options = EdgeOptions()
+            else:
+                raise ValueError(f"不支持的浏览器类型: {self.browser}")
             
             if headless:
-                options.add_argument('--headless=new')  # 使用新的无头模式
+                if self.browser == 'chrome':
+                    options.add_argument('--headless=new')  # Chrome新的无头模式
+                elif self.browser == 'edge':
+                    options.add_argument('--headless=new')  # Edge新的无头模式
                 logger.info("使用无头模式")
             
             # 基本设置 - 针对版本兼容性和渲染器连接问题优化
@@ -169,45 +212,67 @@ class WeixinSpiderWithImages:
             }
             options.add_experimental_option("prefs", prefs)
             
-            # 优先尝试使用系统ChromeDriver
+            # 优先尝试使用系统浏览器驱动
             try:
-                logger.info("尝试使用系统ChromeDriver...")
-                chromedriver_path = self.find_chromedriver_path()
-                if chromedriver_path:
-                    service = Service(chromedriver_path)
-                    self.driver = webdriver.Chrome(service=service, options=options)
-                    logger.info("使用系统ChromeDriver成功初始化")
-                    return
-                else:
-                    logger.info("未找到系统ChromeDriver，尝试使用webdriver-manager")
+                logger.info(f"尝试使用系统{self.browser}Driver...")
+                if self.browser == 'chrome':
+                    driver_path = self.find_chromedriver_path()
+                    if driver_path:
+                        service = ChromeService(driver_path)
+                        self.driver = webdriver.Chrome(service=service, options=options)
+                        logger.info("使用系统ChromeDriver成功初始化")
+                        return
+                    else:
+                        logger.info("未找到系统ChromeDriver，尝试使用webdriver-manager")
+                elif self.browser == 'edge':
+                    # 查找EdgeDriver路径
+                    edge_driver_path = shutil.which('msedgedriver') or shutil.which('edgedriver')
+                    if edge_driver_path and os.path.exists(edge_driver_path):
+                        service = EdgeService(edge_driver_path)
+                        self.driver = webdriver.Edge(service=service, options=options)
+                        logger.info("使用系统EdgeDriver成功初始化")
+                        return
+                    else:
+                        logger.info("未找到系统EdgeDriver，尝试使用webdriver-manager")
             except Exception as system_error:
-                logger.warning(f"系统ChromeDriver失败: {system_error}")
+                logger.warning(f"系统{self.browser}Driver失败: {system_error}")
                 
             # 尝试使用webdriver-manager
             try:
-                logger.info("使用webdriver-manager自动下载兼容的ChromeDriver...")
-                service = Service(ChromeDriverManager().install())
-                self.driver = webdriver.Chrome(service=service, options=options)
-                logger.info("使用webdriver-manager成功初始化ChromeDriver")
-                return
+                logger.info(f"使用webdriver-manager自动下载兼容的{self.browser}Driver...")
+                if self.browser == 'chrome':
+                    service = ChromeService(ChromeDriverManager().install())
+                    self.driver = webdriver.Chrome(service=service, options=options)
+                    logger.info("使用webdriver-manager成功初始化ChromeDriver")
+                    return
+                elif self.browser == 'edge':
+                    service = EdgeService(EdgeChromiumDriverManager().install())
+                    self.driver = webdriver.Edge(service=service, options=options)
+                    logger.info("使用webdriver-manager成功初始化EdgeDriver")
+                    return
             except Exception as wdm_error:
                 logger.error(f"webdriver-manager失败: {wdm_error}")
                 
             # 最后尝试不指定service
             try:
-                logger.info("尝试使用默认ChromeDriver配置...")
-                self.driver = webdriver.Chrome(options=options)
-                logger.info("使用默认配置成功初始化ChromeDriver")
-                return
+                logger.info(f"尝试使用默认{self.browser}Driver配置...")
+                if self.browser == 'chrome':
+                    self.driver = webdriver.Chrome(options=options)
+                    logger.info("使用默认配置成功初始化ChromeDriver")
+                    return
+                elif self.browser == 'edge':
+                    self.driver = webdriver.Edge(options=options)
+                    logger.info("使用默认配置成功初始化EdgeDriver")
+                    return
             except Exception as default_error:
                 logger.error(f"默认配置也失败: {default_error}")
-                raise RuntimeError(f"无法初始化Chrome浏览器驱动: {default_error}")
+                raise RuntimeError(f"无法初始化{self.browser}浏览器驱动: {default_error}")
             
         except Exception as e:
             logger.error(f"设置浏览器驱动失败: {str(e)}")
             # 提供备用方案
             self.driver = None
-            raise RuntimeError(f"无法初始化Chrome浏览器驱动: {e}")
+            raise RuntimeError(f"无法初始化{self.browser}浏览器驱动: {e}")
     
     def crawl_article_by_url(self, url, retry_times=2):
         """通过URL抓取文章内容，支持重试，优化页面加载等待策略"""
@@ -242,8 +307,8 @@ class WeixinSpiderWithImages:
                 # 提取文章信息
                 article_data = self._extract_article_content()
                 
-                if article_data and article_data.get('title'):
-                    logger.info(f"成功抓取文章: {article_data['title']}")
+                if article_data and article_data.title:
+                    logger.info(f"成功抓取文章: {article_data.title}")
                     return article_data
                 else:
                     logger.warning(f"第 {attempt + 1} 次尝试未能获取完整文章内容")
@@ -280,8 +345,6 @@ class WeixinSpiderWithImages:
     def _extract_article_content(self):
         """提取文章内容，优化选择器和解析逻辑"""
         try:
-            article_data = {}
-            
             # 获取文章标题 - 尝试多种选择器
             title_selectors = [
                 "#activity-name",
@@ -291,8 +354,7 @@ class WeixinSpiderWithImages:
                 "[class*='title']"
             ]
             
-            title = self._get_text_by_selectors(title_selectors, "未知标题")
-            article_data['title'] = title.strip()
+            title = self._get_text_by_selectors(title_selectors, "未知标题").strip()
             logger.info(f"提取到标题: {title}")
             
             # 获取作者信息
@@ -302,8 +364,7 @@ class WeixinSpiderWithImages:
                 "[class*='author']",
                 "[id*='author']"
             ]
-            author = self._get_text_by_selectors(author_selectors, "未知作者")
-            article_data['author'] = author.strip()
+            author = self._get_text_by_selectors(author_selectors, "未知作者").strip()
             
             # 获取发布时间
             time_selectors = [
@@ -312,8 +373,7 @@ class WeixinSpiderWithImages:
                 "[class*='time']",
                 "[id*='time']"
             ]
-            publish_time = self._get_text_by_selectors(time_selectors, "未知时间")
-            article_data['publish_time'] = publish_time.strip()
+            publish_time = self._get_text_by_selectors(time_selectors, "未知时间").strip()
             
             # 获取文章正文内容
             content_selectors = [
@@ -325,16 +385,18 @@ class WeixinSpiderWithImages:
             
             content_element = self._get_element_by_selectors(content_selectors)
             
+            content_html = ""
+            content = ""
+            images = []
+            
             if content_element:
                 # 获取HTML内容
                 content_html = content_element.get_attribute('innerHTML')
-                article_data['content_html'] = content_html
                 
                 # 提取图片信息
                 if self.download_images:
-                    images_info = self._extract_images_from_content(content_element)
-                    article_data['images'] = images_info
-                    logger.info(f"发现 {len(images_info)} 张图片")
+                    images = self._extract_images_from_content(content_element)
+                    logger.info(f"发现 {len(images)} 张图片")
                 
                 # 使用BeautifulSoup解析HTML，提取纯文本
                 soup = BeautifulSoup(content_html, 'html.parser')
@@ -343,20 +405,26 @@ class WeixinSpiderWithImages:
                 for script in soup(["script", "style"]):
                     script.decompose()
                 
-                content_text = soup.get_text(separator='\n', strip=True)
-                article_data['content'] = content_text
-                logger.info(f"提取到内容长度: {len(content_text)} 字符")
+                content = soup.get_text(separator='\n', strip=True)
+                logger.info(f"提取到内容长度: {len(content)} 字符")
             else:
                 logger.warning("未能找到文章正文内容")
-                article_data['content_html'] = ""
-                article_data['content'] = ""
-                article_data['images'] = []
             
-            # 获取当前URL
-            article_data['url'] = self.driver.current_url
-            article_data['crawl_time'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            # 获取当前URL和抓取时间
+            url = self.driver.current_url
+            crawl_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
             
-            return article_data
+            # 创建并返回ArticleData实例
+            return ArticleData(
+                title=title,
+                author=author,
+                publish_time=publish_time,
+                content_html=content_html,
+                content=content,
+                url=url,
+                crawl_time=crawl_time,
+                images=images
+            )
             
         except Exception as e:
             logger.error(f"提取文章内容失败: {str(e)}", exc_info=True)
@@ -391,15 +459,13 @@ class WeixinSpiderWithImages:
                     alt_text = img.get_attribute('alt') or f"图片_{i+1}"
                     title_text = img.get_attribute('title') or ""
                     
-                    image_info = {
-                        'index': i + 1,
-                        'url': img_url,
-                        'alt': alt_text,
-                        'title': title_text,
-                        'filename': None,  # 将在下载时设置
-                        'local_path': None,  # 将在下载时设置
-                        'download_success': False
-                    }
+                    # 创建ImageInfo对象
+                    image_info = ImageInfo(
+                        index=i + 1,
+                        url=img_url,
+                        alt=alt_text,
+                        title=title_text
+                    )
                     
                     images_info.append(image_info)
                     
@@ -573,9 +639,9 @@ class WeixinSpiderWithImages:
             # 创建下载任务
             future_to_img = {
                 executor.submit(self._download_image, 
-                               img_info['url'], 
+                               img_info.url, 
                                images_dir, 
-                               f"img_{img_info['index']:03d}"): img_info
+                               f"img_{img_info.index:03d}"): img_info
                 for img_info in images_info
             }
             
@@ -585,16 +651,16 @@ class WeixinSpiderWithImages:
                 try:
                     filename, filepath = future.result()
                     if filename and filepath:
-                        img_info['filename'] = filename
-                        img_info['local_path'] = filepath
-                        img_info['download_success'] = True
+                        img_info.filename = filename
+                        img_info.local_path = filepath
+                        img_info.download_success = True
                     else:
-                        img_info['download_success'] = False
+                        img_info.download_success = False
                 except Exception as e:
-                    logger.error(f"下载图片 {img_info['url']} 时出错: {str(e)}")
-                    img_info['download_success'] = False
+                    logger.error(f"下载图片 {img_info.url} 时出错: {str(e)}")
+                    img_info.download_success = False
         
-        success_count = sum(1 for img in images_info if img['download_success'])
+        success_count = sum(1 for img in images_info if img.download_success)
         logger.info(f"图片下载完成: {success_count}/{len(images_info)} 张成功")
     
     def save_article_to_file(self, article_data, custom_filename=None):
@@ -612,7 +678,7 @@ class WeixinSpiderWithImages:
             if custom_filename:
                 safe_filename = custom_filename
             else:
-                title = article_data.get('title', '未知标题')
+                title = article_data.title
                 # 移除文件名中的非法字符
                 safe_title = re.sub(r'[<>:"/\\|?*]', '_', title)
                 safe_title = safe_title[:50]  # 限制长度
@@ -624,35 +690,35 @@ class WeixinSpiderWithImages:
             os.makedirs(article_dir, exist_ok=True)
             
             # 下载图片
-            if self.download_images and article_data.get('images'):
-                self._download_all_images(article_data['images'], article_dir)
+            if self.download_images and article_data.images:
+                self._download_all_images(article_data.images, article_dir)
             
             # 保存JSON格式，优化JSON输出
             json_filepath = os.path.join(article_dir, f"{safe_filename}.json")
             with open(json_filepath, 'w', encoding='utf-8') as f:
-                json.dump(article_data, f, ensure_ascii=False, indent=2)
+                json.dump(asdict(article_data), f, ensure_ascii=False, indent=2)
             logger.info(f"JSON文件已保存: {json_filepath}")
             
             # 保存TXT格式
             txt_filepath = os.path.join(article_dir, f"{safe_filename}.txt")
             with open(txt_filepath, 'w', encoding='utf-8') as f:
-                f.write(f"标题: {article_data.get('title', '')}\n")
-                f.write(f"作者: {article_data.get('author', '')}\n")
-                f.write(f"发布时间: {article_data.get('publish_time', '')}\n")
-                f.write(f"抓取时间: {article_data.get('crawl_time', '')}\n")
-                f.write(f"链接: {article_data.get('url', '')}\n")
+                f.write(f"标题: {article_data.title}\n")
+                f.write(f"作者: {article_data.author}\n")
+                f.write(f"发布时间: {article_data.publish_time}\n")
+                f.write(f"抓取时间: {article_data.crawl_time}\n")
+                f.write(f"链接: {article_data.url}\n")
                 f.write("\n" + "="*80 + "\n\n")
-                f.write(article_data.get('content', ''))
+                f.write(article_data.content)
                 
                 # 添加图片信息
-                if article_data.get('images'):
+                if article_data.images:
                     f.write("\n\n" + "="*80 + "\n")
                     f.write("图片信息:\n")
-                    for img in article_data['images']:
-                        f.write(f"\n图片 {img['index']}: {img['alt']}\n")
-                        f.write(f"原始URL: {img['url']}\n")
-                        if img['download_success']:
-                            f.write(f"本地文件: {img['filename']}\n")
+                    for img in article_data.images:
+                        f.write(f"\n图片 {img.index}: {img.alt}\n")
+                        f.write(f"原始URL: {img.url}\n")
+                        if img.download_success:
+                            f.write(f"本地文件: {img.filename}\n")
                         else:
                             f.write("下载失败\n")
             
@@ -742,19 +808,19 @@ def test_spider_with_images():
             
             if article_data:
                 logger.info("✅ 抓取成功")
-                logger.info(f"标题: {article_data.get('title', 'N/A')}")
-                logger.info(f"作者: {article_data.get('author', 'N/A')}")
-                logger.info(f"发布时间: {article_data.get('publish_time', 'N/A')}")
-                logger.info(f"内容长度: {len(article_data.get('content', ''))} 字符")
-                logger.info(f"图片数量: {len(article_data.get('images', []))} 张")
+                logger.info(f"标题: {article_data.title}")
+                logger.info(f"作者: {article_data.author}")
+                logger.info(f"发布时间: {article_data.publish_time}")
+                logger.info(f"内容长度: {len(article_data.content)} 字符")
+                logger.info(f"图片数量: {len(article_data.images)} 张")
                 
                 # 显示图片信息
-                images = article_data.get('images', [])
+                images = article_data.images
                 if images:
                     logger.info("\n📷 图片信息:")
                     for img in images:
-                        logger.info(f"  图片 {img['index']}: {img['alt']}")
-                        logger.info(f"    URL: {img['url'][:80]}...")
+                        logger.info(f"  图片 {img.index}: {img.alt}")
+                        logger.info(f"    URL: {img.url[:80]}...")
                 
                 # 保存文章
                 if spider.save_article_to_file(article_data, f"test_with_images_{i}"):
@@ -762,7 +828,7 @@ def test_spider_with_images():
                     
                     # 统计下载成功的图片
                     if images:
-                        success_count = sum(1 for img in images if img.get('download_success', False))
+                        success_count = sum(1 for img in images if img.download_success)
                         logger.info(f"📊 图片下载统计: {success_count}/{len(images)} 张成功")
                 else:
                     logger.error("❌ 文章保存失败")

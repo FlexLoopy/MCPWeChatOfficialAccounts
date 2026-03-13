@@ -11,8 +11,14 @@ wait_time = 10
 # 是否下载文章中的图片
 download_images = true
 
+# 浏览器类型，支持'chrome'和'edge'
+browser = "edge"
+
 # ChromeDriver路径（可选，自动管理时可留空）
 chrome_driver_path = ""
+
+# EdgeDriver路径（可选，自动管理时可留空）
+edge_driver_path = ""
 
 # 文章保存目录
 articles_dir = "articles"

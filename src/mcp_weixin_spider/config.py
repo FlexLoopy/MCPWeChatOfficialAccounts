@@ -18,7 +18,9 @@ class SpiderConfig:
     headless: bool = True
     wait_time: int = 10
     download_images: bool = True
+    browser: str = "chrome"  # 浏览器类型，支持'chrome'和'edge'
     chrome_driver_path: Optional[str] = None
+    edge_driver_path: Optional[str] = None
     articles_dir: str = "articles"
     images_dir: str = "images"
     
@@ -31,6 +33,8 @@ class SpiderConfig:
             errors["articles_dir"] = "文章保存目录不能为空"
         if not self.images_dir:
             errors["images_dir"] = "图片保存目录不能为空"
+        if self.browser not in ["chrome", "edge"]:
+            errors["browser"] = "浏览器类型必须是'chrome'或'edge'"
         return errors
 
 
@@ -96,7 +100,9 @@ class ConfigManager:
         "HEADLESS": ("spider", "headless", bool),
         "DOWNLOAD_IMAGES": ("spider", "download_images", bool),
         "WAIT_TIME": ("spider", "wait_time", int),
+        "BROWSER": ("spider", "browser", str),
         "CHROME_DRIVER_PATH": ("spider", "chrome_driver_path", str),
+        "EDGE_DRIVER_PATH": ("spider", "edge_driver_path", str),
         "ARTICLES_DIR": ("spider", "articles_dir", str),
         "IMAGES_DIR": ("spider", "images_dir", str),
         # MCP配置
