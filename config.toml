@@ -1,0 +1,18 @@
+# MCP微信爬虫配置文件
+
+[spider]
+headless = true
+wait_time = 15
+download_images = true
+articles_dir = "articles"
+images_dir = "images"
+
+[mcp]
+server_name = "mcp-weixin-spider"
+transport = "stdio"
+debug = false
+
+[log]
+level = "INFO"
+format = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+file = ""

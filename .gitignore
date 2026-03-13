@@ -1,0 +1,34 @@
+**/__pycache__
+**/.pkl_memoize_py3
+logs/*
+outputs/*
+test_script/
+models/face_detection/data/*
+models/face_classification/data/*
+models/face_rec/weight/face_rec.caffemodel
+models/face_rec/weight/face_rec.prototxt
+models/face_rec/dataset/
+temp*/
+*.log
+draft/
+.temp/
+_build/
+build/
+.tmp/
+*so
+.pkl_memoize_py3/
+
+# Jupyter Lite
+*.db
+_contents/
+
+# temp
+runs/
+.temp*/
+temp*/
+models/test
+models/xmdemo
+models/telecom
+*.egg-info
+
+./articles/
