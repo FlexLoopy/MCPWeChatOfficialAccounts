@@ -18,7 +18,7 @@ from pathlib import Path
 # 添加当前目录到Python路径
 sys.path.insert(0, str(Path(__file__).parent))
 
-from server import main as server_main
+from mcp_weixin_spider.server import main as server_main
 
 
 def create_parser():
@@ -36,27 +36,19 @@ def create_parser():
   
   # 显示版本信息
   python main.py --version
-        """
+        """,
     )
-    
+
     parser.add_argument(
         "mode",
         choices=["server", "client"],
-        help="运行模式：server(服务器), client(交互式客户端)"
+        help="运行模式：server(服务器), client(交互式客户端)",
     )
-    
-    parser.add_argument(
-        "--version",
-        action="version",
-        version="MCP微信爬虫 v0.1.0"
-    )
-    
-    parser.add_argument(
-        "--debug",
-        action="store_true",
-        help="启用调试模式"
-    )
-    
+
+    parser.add_argument("--version", action="version", version="MCP微信爬虫 v0.1.0")
+
+    parser.add_argument("--debug", action="store_true", help="启用调试模式")
+
     return parser
 
 
@@ -65,7 +57,7 @@ def run_server(debug: bool = False):
     if debug:
         logging.getLogger().setLevel(logging.DEBUG)
         print("🐛 调试模式已启用")
-    
+
     print("🚀 启动MCP微信爬虫服务器...")
     server_main()
 
@@ -75,10 +67,11 @@ async def run_client(debug: bool = False):
     if debug:
         logging.getLogger().setLevel(logging.DEBUG)
         print("🐛 调试模式已启用")
-    
+
     print("🎯 运行MCP交互式客户端...")
     # 动态导入client模块，避免循环导入
-    from client import run_client as client_runner
+    from mcp_weixin_spider.client import run_client as client_runner
+
     server_path = Path(__file__).parent / "server.py"
     await client_runner(str(server_path))
 
@@ -87,10 +80,12 @@ def main():
     """主函数"""
     parser = create_parser()
     args = parser.parse_args()
-    
+
     # 配置基本日志
-    logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-    
+    from mcp_weixin_spider.config import setup_logging
+
+    setup_logging()
+
     try:
         if args.mode == "server":
             run_server(args.debug)

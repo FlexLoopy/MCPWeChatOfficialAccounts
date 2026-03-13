@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools>=42", "wheel"]
+requires = ["setuptools>=61.0.0", "wheel>=0.37.0"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -11,41 +11,50 @@ authors = [
 ]
 readme = "README.md"
 license = {file = "LICENSE"}
+urls = { "Homepage" = "https://github.com/example/mcp-weixin-spider", "Documentation" = "https://github.com/example/mcp-weixin-spider/wiki", "Source" = "https://github.com/example/mcp-weixin-spider", "Issues" = "https://github.com/example/mcp-weixin-spider/issues" }
 classifiers = [
     "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
     "License :: OSI Approved :: Apache Software License",
     "Operating System :: OS Independent",
     "Intended Audience :: Developers",
+    "Topic :: Internet :: WWW/HTTP",
     "Topic :: Internet :: WWW/HTTP :: Indexing/Search",
+    "Topic :: Internet :: WWW/HTTP :: Dynamic Content",
     "Topic :: Software Development :: Libraries :: Python Modules",
+    "Topic :: Utilities",
+    "Topic :: System :: Monitoring",
+    "Environment :: Console",
+    "Framework :: AsyncIO"
 ]
 requires-python = ">=3.10"
 dependencies = [
-    "mcp>=1.0.0",
-    "selenium>=4.0.0",
-    "beautifulsoup4>=4.12.0",
-    "requests>=2.31.0",
-    "webdriver-manager>=4.0.0",
-    "Pillow>=10.0.0",
-    "lxml>=4.9.0",
-    "aiofiles>=23.0.0",
-    "coloredlogs>=15.0.0",
-    "pandas>=2.0.0",
-    "numpy>=1.24.0",
-    "toml>=0.10.2"
+    "mcp",
+    "selenium",
+    "beautifulsoup4",
+    "requests",
+    "webdriver-manager",
+    "Pillow",
+    "lxml",
+    "aiofiles",
+    "coloredlogs",
+    "pandas",
+    "numpy",
+    "toml"
 ]
 
 [project.optional-dependencies]
 dev = [
-    "pytest>=7.0.0",
-    "black>=23.0.0",
-    "flake8>=6.0.0",
-    "mypy>=1.0.0"
+    "pytest",
+    "black",
+    "flake8",
+    "mypy"
 ]
 
 [project.scripts]
-mcp-weixin-server = "mcp_weixin_spider.__main__:main"
-mcp-weixin-client = "mcp_weixin_spider.client:run_client"
+mcp-weixin-spider = "mcp_weixin_spider.__main__:main"
 
 [tool.black]
 line-length = 88
@@ -66,16 +75,19 @@ exclude = '''
 python_version = "3.10"
 warn_return_any = true
 warn_unused_configs = true
-disallow_untyped_defs = false
-disallow_incomplete_defs = false
-disallow_untyped_decorators = false
-no_implicit_optional = false
+disallow_untyped_defs = true
+disallow_incomplete_defs = true
+disallow_untyped_decorators = true
+no_implicit_optional = true
 warn_redundant_casts = true
 warn_unused_ignores = true
 warn_no_return = true
-check_untyped_defs = false
-ignore_missing_imports = true
-follow_imports = "skip"
+check_untyped_defs = true
+ignore_missing_imports = false
+follow_imports = "normal"
+strict_optional = true
+warn_unused_variables = true
+warn_unused_parameters = true
 
 [tool.flake8]
 max-line-length = 88

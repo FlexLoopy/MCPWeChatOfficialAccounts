@@ -15,6 +15,7 @@ from typing import Optional, Dict, Any
 @dataclass
 class SpiderConfig:
     """爬虫相关配置"""
+
     headless: bool = True
     wait_time: int = 10
     download_images: bool = True
@@ -23,7 +24,7 @@ class SpiderConfig:
     edge_driver_path: Optional[str] = None
     articles_dir: str = "articles"
     images_dir: str = "images"
-    
+
     def validate(self) -> Dict[str, str]:
         """验证配置有效性"""
         errors = {}
@@ -41,10 +42,11 @@ class SpiderConfig:
 @dataclass
 class MCPConfig:
     """MCP相关配置"""
+
     server_name: str = "mcp-weixin-spider"
     transport: str = "stdio"
     debug: bool = False
-    
+
     def validate(self) -> Dict[str, str]:
         """验证配置有效性"""
         errors = {}
@@ -58,10 +60,11 @@ class MCPConfig:
 @dataclass
 class LogConfig:
     """日志相关配置"""
+
     level: str = "INFO"
     format: str = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
     file: Optional[str] = None
-    
+
     def validate(self) -> Dict[str, str]:
         """验证配置有效性"""
         errors = {}
@@ -74,10 +77,11 @@ class LogConfig:
 @dataclass
 class Config:
     """主配置类"""
+
     spider: SpiderConfig = field(default_factory=SpiderConfig)
     mcp: MCPConfig = field(default_factory=MCPConfig)
     log: LogConfig = field(default_factory=LogConfig)
-    
+
     def validate(self) -> Dict[str, str]:
         """验证所有配置有效性"""
         errors = {}
@@ -85,14 +89,18 @@ class Config:
         errors.update(self.mcp.validate())
         errors.update(self.log.validate())
         return errors
-    
+
     def to_dict(self) -> Dict[str, Any]:
         """转换为字典格式"""
         return asdict(self)
 
 
+@dataclass
 class ConfigManager:
     """配置管理类"""
+    
+    config: Config = field(default_factory=Config)
+    config_path: Optional[Path] = None
     
     # 环境变量映射关系
     ENV_MAPPINGS = {
@@ -113,25 +121,36 @@ class ConfigManager:
         "LOG_LEVEL": ("log", "level", str),
         "LOG_FILE": ("log", "file", str),
     }
-    
-    def __init__(self):
-        self.config: Config = Config()
-        self.config_path: Optional[Path] = None
-    
+
     def load_config(self, config_path: Optional[str] = None) -> Config:
         """
         加载配置文件
-        
+
         Args:
             config_path: 配置文件路径，如果为None则使用默认路径
-            
+
         Returns:
             配置对象
         """
         # 确定配置文件路径
+        self._determine_config_path(config_path)
+        
+        # 加载配置文件
+        self._load_from_file()
+        
+        # 从环境变量加载配置，环境变量优先级高于配置文件
+        self._load_from_env()
+        
+        # 验证配置
+        self._validate_config()
+        
+        return self.config
+    
+    def _determine_config_path(self, config_path: Optional[str]):
+        """确定配置文件路径"""
         if config_path:
-            self.config_path = Path(config_path)
-        else:
+            self.config_path = Path(config_path).absolute()
+        elif not self.config_path:
             # 尝试从多个位置查找配置文件
             possible_paths = [
                 Path("./config.toml"),
@@ -139,28 +158,32 @@ class ConfigManager:
                 Path(os.path.expanduser("~/.mcp-weixin/config.toml")),
             ]
             
-            for path in possible_paths:
-                if path.exists():
-                    self.config_path = path
-                    break
-        
-        # 加载配置文件
+            found_path = next((path for path in possible_paths if path.exists()), None)
+            self.config_path = found_path.absolute() if found_path else None
+    
+    def _load_from_file(self):
+        """从配置文件加载配置"""
         if self.config_path and self.config_path.exists():
             with open(self.config_path, "r", encoding="utf-8") as f:
                 toml_data = toml.load(f)
             
             # 更新配置
             self._update_from_dict(toml_data)
-        
-        # 从环境变量加载配置，环境变量优先级高于配置文件
-        self._load_from_env()
-        
-        # 验证配置
-        errors = self.config.validate()
-        if errors:
-            raise ValueError(f"配置验证失败: {', '.join(f'{k}: {v}' for k, v in errors.items())}")
-        
-        return self.config
+            
+            # 将相对路径转换为基于配置文件的绝对路径
+            if self.config_path:
+                config_dir = self.config_path.parent
+                # 处理spider配置中的相对路径
+                if hasattr(self.config, 'spider'):
+                    spider_config = self.config.spider
+                    if hasattr(spider_config, 'articles_dir') and spider_config.articles_dir:
+                        articles_path = Path(spider_config.articles_dir)
+                        if not articles_path.is_absolute():
+                            spider_config.articles_dir = str(config_dir / articles_path)
+                    if hasattr(spider_config, 'images_dir') and spider_config.images_dir:
+                        images_path = Path(spider_config.images_dir)
+                        if not images_path.is_absolute():
+                            spider_config.images_dir = str(config_dir / images_path)
     
     def _update_from_dict(self, data: Dict[str, Any]):
         """从字典更新配置"""
@@ -170,7 +193,7 @@ class ConfigManager:
                 for key, value in section_data.items():
                     if hasattr(section, key):
                         setattr(section, key, value)
-    
+
     def _load_from_env(self):
         """从环境变量加载配置"""
         for env_key, (section, config_key, data_type) in self.ENV_MAPPINGS.items():
@@ -186,10 +209,18 @@ class ConfigManager:
                 except (ValueError, TypeError) as e:
                     raise ValueError(f"环境变量 {env_key} 格式无效: {e}")
     
+    def _validate_config(self):
+        """验证配置有效性"""
+        errors = self.config.validate()
+        if errors:
+            raise ValueError(
+                f"配置验证失败: {', '.join(f'{k}: {v}' for k, v in errors.items())}"
+            )
+
     def save_config(self, config_path: Optional[str] = None):
         """
         保存配置到文件
-        
+
         Args:
             config_path: 配置文件路径，如果为None则使用当前配置文件路径
         """
@@ -197,10 +228,10 @@ class ConfigManager:
             self.config_path = Path(config_path)
         elif not self.config_path:
             self.config_path = Path("./config.toml")
-        
+
         # 创建配置目录（如果不存在）
         self.config_path.parent.mkdir(parents=True, exist_ok=True)
-        
+
         # 保存配置文件
         with open(self.config_path, "w", encoding="utf-8") as f:
             toml.dump(self.config.to_dict(), f)
@@ -210,3 +241,26 @@ class ConfigManager:
 config_manager = ConfigManager()
 # 加载配置
 config = config_manager.load_config()
+
+
+def setup_logging():
+    """
+    配置日志系统
+
+    根据配置文件中的日志设置，初始化日志系统
+    """
+    import logging
+    import logging.handlers
+
+    # 清除已有的日志配置
+    for handler in logging.root.handlers[:]:
+        logging.root.removeHandler(handler)
+        handler.close()
+
+    # 设置日志级别
+    level = getattr(logging, config.log.level.upper(), logging.INFO)
+
+    # 配置基本日志
+    logging.basicConfig(level=level, format=config.log.format, filename=config.log.file)
+
+    return logging.getLogger()

@@ -1,7 +1,5 @@
 # MCP微信公众号爬虫
 
-修改自 [ditingdapeng/MCPWeChatOfficialAccounts](https://github.com/ditingdapeng/MCPWeChatOfficialAccounts)
-
 基于 **FastMCP** 框架构建的微信公众号文章爬虫系统，让AI智能体能够直接访问和分析微信公众号内容。通过MCP (Model Context Protocol) 标准协议，实现AI智能体与Selenium爬虫的无缝集成。
 
 ## 🎯 项目背景
@@ -17,6 +15,9 @@
 - 🔌 **标准协议** - 完全兼容MCP 1.0+规范，支持stdio通信
 - 🎯 **AI集成** - 可与Claude Desktop、ChatGPT等AI智能体无缝集成
 - 💻 **多种接口** - 提供Python API和交互式命令行界面
+- 🧪 **依赖检查** - 自动检测和安装缺失的依赖包
+- 📁 **数据存储** - 支持多种格式文件保存（JSON、TXT）
+- 🚀 **性能优化** - 内存和CPU使用优化
 
 ## 🏗️ 系统架构
 
@@ -89,7 +90,7 @@ graph TB
 - 环境变量覆盖机制
 - 类型安全的配置访问
 
-#### 5. Selenium爬虫引擎 (`weixin_spider.py`)
+#### 5. Selenium爬虫引擎 (`src/mcp_weixin_spider/spider.py`)
 
 - Chrome浏览器自动化控制
 - 智能ChromeDriver管理（自动安装和路径检测）
@@ -97,6 +98,12 @@ graph TB
 - 图片下载和格式转换
 - 多格式文件保存
 - 内存和性能优化
+
+#### 6. 依赖检查器 (`src/mcp_weixin_spider/spider.py`)
+
+- 自动检测系统依赖
+- 提供详细的依赖缺失信息
+- 支持一键安装缺失依赖
 
 ## 📁 项目结构
 
@@ -108,11 +115,14 @@ MCPWeChatOfficialAccounts/
 │       ├── __main__.py         # 模块入口点
 │       ├── client.py           # MCP客户端实现
 │       ├── config.py           # 配置管理
+│       ├── exceptions.py       # 异常定义
 │       ├── main.py             # 主函数
-│       └── server.py           # FastMCP服务器实现
-├── weixin_spider.py     # Selenium爬虫引擎
+│       ├── server.py           # FastMCP服务器实现
+│       └── spider.py           # Selenium爬虫引擎
+├── weixin_spider.py            # 爬虫测试脚本
 ├── config.toml                 # 主配置文件
 ├── config.toml.example         # 配置文件示例
+├── LICENSE                     # 许可证文件
 ├── pyproject.toml              # 项目元数据和依赖管理
 └── README.md                   # 项目文档
 ```
@@ -121,7 +131,7 @@ MCPWeChatOfficialAccounts/
 
 ### 📋 环境要求
 
-- **Python**:  3.10+
+- **Python**: 3.10+
 - **浏览器**: Chrome/Chromium (自动管理ChromeDriver)
 - **系统**: macOS/Windows/Linux
 
@@ -131,7 +141,7 @@ MCPWeChatOfficialAccounts/
 
 ```bash
 # 1. 克隆项目
-git clone <repository-url>
+git clone https://github.com/example/mcp-weixin-spider.git
 cd MCPWeChatOfficialAccounts
 
 # 2. 安装依赖
@@ -144,11 +154,8 @@ pip install -e .[dev]
 ### 使用pip安装
 
 ```bash
-# 通过PyPI安装稳定版
+# 安装最新版本
 pip install mcp-weixin-spider
-
-# 或安装最新开发版
-pip install git+<repository-url>
 ```
 
 ### ⚙️ 配置管理
@@ -206,17 +213,14 @@ file = ""                   # 日志文件路径（可选）
 #### 使用命令行脚本（推荐）
 
 ```bash
-# 启动MCP服务器
-mcp-weixin-server
-
-# 启动交互式客户端
-mcp-weixin-client
+# 启动MCP服务器（默认模式）
+mcp-weixin-spider
 ```
 
 #### 使用模块化启动
 
 ```bash
-# 启动MCP服务器
+# 启动MCP服务器（默认模式）
 python -m mcp_weixin_spider
 
 # 启动MCP服务器（显式指定server模式）
@@ -224,6 +228,13 @@ python -m mcp_weixin_spider server
 
 # 启动交互式客户端
 python -m mcp_weixin_spider client
+```
+
+#### 测试爬虫功能
+
+```bash
+# 运行爬虫测试脚本
+python weixin_spider.py
 ```
 
 ## 🛠️ MCP工具接口
@@ -251,7 +262,7 @@ python -m mcp_weixin_spider client
 
 | 工具名称                   | 功能描述      | 参数                                                             | 返回值             |
 | ---------------------- | --------- | -------------------------------------------------------------- | --------------- |
-| `crawl_weixin_article` | 爬取微信公众号文章 | `url`: 文章URL`download_images`: 是否下载图片`custom_filename`: 自定义文件名 | 包含文章内容的JSON对象   |
+| `crawl_weixin_article` | 爬取微信公众号文章 | `url`: 文章URL<br>`download_images`: 是否下载图片<br>`custom_filename`: 自定义文件名 | 包含文章内容的JSON对象   |
 | `analyze_article`      | 分析文章内容    | `article_content`: 文章内容                                        | 分析结果（关键词、统计信息等） |
 | `get_article_stats`    | 获取文章统计信息  | `article_content`: 文章内容                                        | 文章统计数据          |
 
@@ -261,7 +272,7 @@ python -m mcp_weixin_spider client
 
 ```bash
 # 克隆项目
-git clone <repository-url>
+git clone https://github.com/example/mcp-weixin-spider.git
 cd MCPWeChatOfficialAccounts
 
 # 安装开发依赖
@@ -286,6 +297,13 @@ python -m build
 # 生成的包文件将位于 dist/ 目录
 ```
 
+### 测试
+
+```bash
+# 运行爬虫测试
+python weixin_spider.py
+```
+
 ### 贡献指南
 
 1. 遵循PEP 8编码规范
@@ -294,3 +312,31 @@ python -m build
 4. 确保所有代码通过flake8检查
 5. 撰写清晰的提交信息
 6. 提交前运行所有检查命令
+
+## ⚠️ 注意事项
+
+1. **使用频率**：请勿过度频繁使用爬虫，避免给微信服务器造成压力
+2. **合法性**：请确保您的爬取行为符合相关法律法规和微信公众平台的使用条款
+3. **Chrome版本**：建议使用最新版本的Chrome浏览器，以获得最佳兼容性
+4. **内存使用**：长时间运行可能会消耗较多内存，建议定期重启服务
+5. **网络环境**：请确保网络环境稳定，避免因网络问题导致爬取失败
+
+## 📄 许可证
+
+Apache License 2.0
+
+## 📞 联系方式
+
+- 项目主页：https://github.com/example/mcp-weixin-spider
+- 文档：https://github.com/example/mcp-weixin-spider/wiki
+- 问题反馈：https://github.com/example/mcp-weixin-spider/issues
+
+## 📝 更新日志
+
+### v0.1.0 (2026-03-13)
+
+- 初始版本发布
+- 实现微信公众号文章爬取功能
+- 支持MCP协议
+- 支持图片下载和保存
+- 提供AI智能体集成接口
