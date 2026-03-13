@@ -3,7 +3,7 @@
 [!\[Python\](https://img.shields.io/badge/Python-3.8+-blue.svg null)](https://python.org)
 [!\[MCP\](https://img.shields.io/badge/MCP-1.0+-green.svg null)](https://github.com/modelcontextprotocol)
 [!\[FastMCP\](https://img.shields.io/badge/FastMCP-Latest-orange.svg null)](https://github.com/jlowin/fastmcp)
-[!\[许可证\](https://img.shields.io/badge/许可证-MIT-yellow.svg null)](LICENSE)
+[!\[许可证\](https://img.shields.io/badge/许可证-Apache--2.0-yellow.svg null)](LICENSE)
 
 修改自 [ditingdapeng/MCPWeChatOfficialAccounts](https://github.com/ditingdapeng/MCPWeChatOfficialAccounts)
 
@@ -146,11 +146,14 @@ pip install .
 pip install -e .[dev]
 ```
 
-### 使用pip安装（即将支持）
+### 使用pip安装
 
 ```bash
-# 未来将支持通过PyPI安装
-# pip install mcp-weixin-spider
+# 通过PyPI安装稳定版
+pip install mcp-weixin-spider
+
+# 或安装最新开发版
+pip install git+<repository-url>
 ```
 
 ### 🔧 Trae IDE 配置指南
