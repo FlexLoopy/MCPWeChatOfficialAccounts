@@ -839,10 +839,10 @@ class DependencyChecker:
         for pkg, import_name in required_packages.items():
             try:
                 __import__(import_name)
-                logger.info(f"✅ {pkg} 已安装")
+                logger.info(f"[SUCCESS] {pkg} 已安装")
             except ImportError:
                 missing.append(pkg)
-                logger.error(f"❌ {pkg} 未安装")
+                logger.error(f"[ERROR] {pkg} 未安装")
 
         if missing:
             logger.error(f"缺少依赖: {', '.join(missing)}")

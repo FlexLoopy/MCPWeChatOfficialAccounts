@@ -62,7 +62,7 @@ class TestConfigIntegration(unittest.TestCase):
         # 检查配置文件中的特定值是否被正确加载
         expected_browser = "edge"  # 从config.toml中读取
         expected_articles_dir = ".temp"  # 从config.toml中读取
-        expected_images_dir = ".images"  # 从config.toml中读取
+        expected_images_dir = "images"  # 从config.toml中读取
         
         actual_browser = config.spider.browser
         actual_articles_dir = Path(config.spider.articles_dir).name

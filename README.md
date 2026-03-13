@@ -164,12 +164,6 @@ pip install mcp-weixin-spider
 
 #### 配置文件
 
-复制示例配置文件并根据需要修改：
-
-```bash
-cp config.toml.example config.toml
-```
-
 配置文件说明：
 
 ```toml
@@ -177,36 +171,42 @@ cp config.toml.example config.toml
 headless = true          # 是否使用无头模式运行浏览器
 wait_time = 10           # 页面等待时间（秒）
 download_images = true   # 是否下载文章中的图片
-articles_dir = "articles" # 文章保存目录
-images_dir = "images"     # 图片保存目录
+browser = "chrome"        # 浏览器类型，支持'chrome'和'edge'
+chrome_driver_path = ""   # ChromeDriver路径（可选，自动管理时可留空）
+edge_driver_path = ""     # EdgeDriver路径（可选，自动管理时可留空）
+articles_dir = ".temp"     # 文章保存目录
+images_dir = ".images"    # 图片保存目录
 
 [mcp]
 server_name = "mcp-weixin-spider" # MCP服务器名称
-transport = "stdio"         # 传输方式
+transport = "stdio"         # 传输方式（stdio或tcp）
 debug = false              # 是否启用调试模式
 
 [log]
-level = "INFO"              # 日志级别
+level = "INFO"              # 日志级别（DEBUG, INFO, WARNING, ERROR, CRITICAL）
 format = "%(asctime)s - %(name)s - %(levelname)s - %(message)s" # 日志格式
-file = ""                   # 日志文件路径（可选）
+file = ""                   # 日志文件路径（可选，留空则输出到控制台）
 ```
 
 #### 环境变量
 
 支持通过环境变量覆盖配置文件中的设置：
 
-| 环境变量              | 对应配置项                   | 说明       |
-| ----------------- | ----------------------- | -------- |
-| HEADLESS          | spider.headless         | 是否使用无头模式 |
-| WAIT\_TIME        | spider.wait\_time       | 页面等待时间   |
-| DOWNLOAD\_IMAGES  | spider.download\_images | 是否下载图片   |
-| ARTICLES\_DIR     | spider.articles\_dir    | 文章保存目录   |
-| IMAGES\_DIR       | spider.images\_dir      | 图片保存目录   |
-| MCP\_SERVER\_NAME | mcp.server\_name        | MCP服务器名称 |
-| MCP\_TRANSPORT    | mcp.transport           | 传输方式     |
-| MCP\_DEBUG        | mcp.debug               | 是否启用调试模式 |
-| LOG\_LEVEL        | log.level               | 日志级别     |
-| LOG\_FILE         | log.file                | 日志文件路径   |
+| 环境变量                 | 对应配置项                       | 说明                 |
+| -------------------- | --------------------------- | ------------------ |
+| HEADLESS             | spider.headless             | 是否使用无头模式           |
+| DOWNLOAD\_IMAGES     | spider.download\_images     | 是否下载图片             |
+| WAIT\_TIME           | spider.wait\_time           | 页面等待时间             |
+| BROWSER              | spider.browser              | 浏览器类型（chrome或edge） |
+| CHROME\_DRIVER\_PATH | spider.chrome\_driver\_path | ChromeDriver路径（可选） |
+| EDGE\_DRIVER\_PATH   | spider.edge\_driver\_path   | EdgeDriver路径（可选）   |
+| ARTICLES\_DIR        | spider.articles\_dir        | 文章保存目录             |
+| IMAGES\_DIR          | spider.images\_dir          | 图片保存目录             |
+| MCP\_SERVER\_NAME    | mcp.server\_name            | MCP服务器名称           |
+| MCP\_TRANSPORT       | mcp.transport               | 传输方式（stdio或tcp）    |
+| MCP\_DEBUG           | mcp.debug                   | 是否启用调试模式           |
+| LOG\_LEVEL           | log.level                   | 日志级别               |
+| LOG\_FILE            | log.file                    | 日志文件路径             |
 
 ### 🎮 启动方式
 
@@ -239,30 +239,11 @@ python weixin_spider.py
 
 ## 🛠️ MCP工具接口
 
-```yaml
-{
-  "mcpServers": {
-    "weixin_spider": {
-      "command": "python",
-      "args": [
-        "-m", "mcp_weixin_spider"
-      ],
-      "env": {
-        "ARTICLES_DIR": "articles",
-        "DOWNLOAD_IMAGES": "true",
-        "HEADLESS": "true",
-        "WAIT_TIME": "10"
-      }
-    }
-  }
-}
-```
-
 ### 工具列表
 
 | 工具名称                   | 功能描述      | 参数                                                             | 返回值             |
 | ---------------------- | --------- | -------------------------------------------------------------- | --------------- |
-| `crawl_weixin_article` | 爬取微信公众号文章 | `url`: 文章URL<br>`download_images`: 是否下载图片<br>`custom_filename`: 自定义文件名 | 包含文章内容的JSON对象   |
+| `crawl_weixin_article` | 爬取微信公众号文章 | `url`: 文章URL`download_images`: 是否下载图片`custom_filename`: 自定义文件名 | 包含文章内容的JSON对象   |
 | `analyze_article`      | 分析文章内容    | `article_content`: 文章内容                                        | 分析结果（关键词、统计信息等） |
 | `get_article_stats`    | 获取文章统计信息  | `article_content`: 文章内容                                        | 文章统计数据          |
 
@@ -325,12 +306,6 @@ python weixin_spider.py
 
 Apache License 2.0
 
-## 📞 联系方式
-
-- 项目主页：https://github.com/example/mcp-weixin-spider
-- 文档：https://github.com/example/mcp-weixin-spider/wiki
-- 问题反馈：https://github.com/example/mcp-weixin-spider/issues
-
 ## 📝 更新日志
 
 ### v0.1.0 (2026-03-13)
@@ -340,3 +315,4 @@ Apache License 2.0
 - 支持MCP协议
 - 支持图片下载和保存
 - 提供AI智能体集成接口
+

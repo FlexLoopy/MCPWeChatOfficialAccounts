@@ -56,9 +56,9 @@ def run_server(debug: bool = False):
     """运行MCP服务器"""
     if debug:
         logging.getLogger().setLevel(logging.DEBUG)
-        print("🐛 调试模式已启用")
+        print("[DEBUG] 调试模式已启用")
 
-    print("🚀 启动MCP微信爬虫服务器...")
+    print("[INFO] 启动MCP微信爬虫服务器...")
     server_main()
 
 
@@ -66,9 +66,9 @@ async def run_client(debug: bool = False):
     """运行交互式客户端"""
     if debug:
         logging.getLogger().setLevel(logging.DEBUG)
-        print("🐛 调试模式已启用")
+        print("[DEBUG] 调试模式已启用")
 
-    print("🎯 运行MCP交互式客户端...")
+    print("[INFO] 运行MCP交互式客户端...")
     # 动态导入client模块，避免循环导入
     from mcp_weixin_spider.client import run_client as client_runner
 
@@ -92,9 +92,9 @@ def main():
         elif args.mode == "client":
             asyncio.run(run_client(args.debug))
     except KeyboardInterrupt:
-        print("\n👋 程序已退出")
+        print("\n[INFO] 程序已退出")
     except Exception as e:
-        print(f"❌ 运行时错误: {e}")
+        print(f"[ERROR] 运行时错误: {e}")
         if args.debug:
             traceback.print_exc()
         sys.exit(1)

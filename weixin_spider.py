@@ -42,15 +42,15 @@ def test_spider():
             
             article = spider.crawl_article_by_url(url)
             if article:
-                logger.info(f"✅ 抓取成功，标题: {article.title}")
+                logger.info(f"[SUCCESS] 抓取成功，标题: {article.title}")
                 logger.info(f"图片数量: {len(article.images)} 张")
                 
                 if spider.save_article(article):
-                    logger.info("✅ 文章保存成功")
+                    logger.info("[SUCCESS] 文章保存成功")
                 else:
-                    logger.error("❌ 文章保存失败")
+                    logger.error("[ERROR] 文章保存失败")
             else:
-                logger.error("❌ 抓取失败")
+                logger.error("[ERROR] 抓取失败")
         
         logger.info("\n=== 测试完成 ===")
         

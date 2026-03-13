@@ -22,7 +22,7 @@ edge_driver_path = ""
 articles_dir = ".temp"
 
 # 图片保存目录
-images_dir = ".images"
+images_dir = "images"
 
 [mcp]
 # MCP服务器名称
