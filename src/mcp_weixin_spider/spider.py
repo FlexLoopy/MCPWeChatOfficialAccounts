@@ -851,5 +851,5 @@ class DependencyChecker:
             )
             return False
 
-        logger.info("✅ 所有依赖已安装")
+        logger.info("[SUCCESS] 所有依赖已安装")
         return True
