@@ -8,7 +8,7 @@ import os
 import tempfile
 import unittest
 from pathlib import Path
-from src.mcp_weixin_spider.config import (
+from mcp_weixin_spider.config import (
     ConfigManager, Config, SpiderConfig, MCPConfig, LogConfig
 )
 
@@ -242,32 +242,46 @@ class TestConfigManager(unittest.TestCase):
         manager._determine_config_path(str(test_path))
         self.assertEqual(manager.config_path, test_path)
         
-        # 创建一个子目录，确保其中没有配置文件
-        empty_dir = self.temp_path / "empty_dir"
-        empty_dir.mkdir()
+        # 保存原始配置文件路径，用于恢复
+        original_config_path = Path(__file__).parent.parent / "config.toml"
+        backup_config_path = None
         
-        # 切换到空目录测试默认路径查找
-        original_cwd = Path.cwd()
-        os.chdir(empty_dir)
         try:
-            manager.config_path = None
-            manager._determine_config_path(None)
-            self.assertIsNone(manager.config_path)  # 因为空目录中没有默认配置文件
+            # 临时重命名项目根目录的配置文件，以便测试空目录情况
+            if original_config_path.exists():
+                backup_config_path = original_config_path.with_suffix('.toml.bak')
+                original_config_path.rename(backup_config_path)
+            
+            # 创建一个子目录，确保其中没有配置文件
+            empty_dir = self.temp_path / "empty_dir"
+            empty_dir.mkdir()
+            
+            # 切换到空目录测试默认路径查找
+            original_cwd = Path.cwd()
+            os.chdir(empty_dir)
+            try:
+                manager.config_path = None
+                manager._determine_config_path(None)
+                self.assertIsNone(manager.config_path)  # 因为空目录中没有默认配置文件
+            finally:
+                os.chdir(original_cwd)
+            
+            # 创建临时默认配置文件并测试
+            default_config = self.temp_path / "config.toml"
+            default_config.write_text("[spider]\nheadless = false")
+            
+            # 切换到临时目录测试默认路径查找
+            os.chdir(self.temp_path)
+            try:
+                manager.config_path = None
+                manager._determine_config_path(None)
+                self.assertEqual(manager.config_path, default_config)
+            finally:
+                os.chdir(original_cwd)
         finally:
-            os.chdir(original_cwd)
-        
-        # 创建临时默认配置文件并测试
-        default_config = self.temp_path / "config.toml"
-        default_config.write_text("[spider]\nheadless = false")
-        
-        # 切换到临时目录测试默认路径查找
-        os.chdir(self.temp_path)
-        try:
-            manager.config_path = None
-            manager._determine_config_path(None)
-            self.assertEqual(manager.config_path, default_config)
-        finally:
-            os.chdir(original_cwd)
+            # 恢复原始配置文件
+            if backup_config_path and backup_config_path.exists():
+                backup_config_path.rename(original_config_path)
 
 
 if __name__ == "__main__":

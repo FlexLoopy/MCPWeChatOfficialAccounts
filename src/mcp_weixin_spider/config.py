@@ -156,6 +156,10 @@ class ConfigManager:
                 Path("./config.toml"),
                 Path("./src/config.toml"),
                 Path(os.path.expanduser("~/.mcp-weixin/config.toml")),
+                # 添加当前文件所在目录的父级目录下的config.toml
+                Path(__file__).parent.parent.parent / "config.toml",
+                # 添加当前工作目录的父级目录下的config.toml
+                Path.cwd() / "config.toml",
             ]
             
             found_path = next((path for path in possible_paths if path.exists()), None)
