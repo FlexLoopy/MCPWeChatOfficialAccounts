@@ -55,9 +55,9 @@ class WeixinSpiderWithImages:
         self.download_images = download_images
         self.session = requests.Session()
         self.max_workers = max_workers
+        self._chrome_driver_path = None
         self.setup_session()
         self.setup_driver(headless)
-        self._chrome_driver_path = None
         
     def setup_session(self):
         """设置requests会话，优化请求头和连接池"""

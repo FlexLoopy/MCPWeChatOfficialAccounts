@@ -3,10 +3,9 @@
 [!\[Python\](https://img.shields.io/badge/Python-3.8+-blue.svg null)](https://python.org)
 [!\[MCP\](https://img.shields.io/badge/MCP-1.0+-green.svg null)](https://github.com/modelcontextprotocol)
 [!\[FastMCP\](https://img.shields.io/badge/FastMCP-Latest-orange.svg null)](https://github.com/jlowin/fastmcp)
-[!\[License\](https://img.shields.io/badge/License-MIT-yellow.svg null)](LICENSE)
+[!\[许可证\](https://img.shields.io/badge/许可证-MIT-yellow.svg null)](LICENSE)
 
 修改自 [ditingdapeng/MCPWeChatOfficialAccounts](https://github.com/ditingdapeng/MCPWeChatOfficialAccounts)
-```
 
 基于 **FastMCP** 框架构建的微信公众号文章爬虫系统，让AI智能体能够直接访问和分析微信公众号内容。通过MCP (Model Context Protocol) 标准协议，实现AI智能体与Selenium爬虫的无缝集成。
 
@@ -127,7 +126,7 @@ MCPWeChatOfficialAccounts/
 
 ### 📋 环境要求
 
-- **Python**: 3.8+ (推荐 3.10+)
+- **Python**:  3.10+
 - **浏览器**: Chrome/Chromium (自动管理ChromeDriver)
 - **系统**: macOS/Windows/Linux
 
@@ -153,6 +152,146 @@ pip install -e .[dev]
 # 未来将支持通过PyPI安装
 # pip install mcp-weixin-spider
 ```
+
+### 🔧 Trae IDE 配置指南
+
+本部分提供了使用 Trae IDE 和 SOLO Coder 自动化配置 MCP 的详细说明。
+
+#### 前置条件
+
+- **Trae IDE**：从官方网站安装最新版本的 Trae IDE
+- **SOLO Coder**：确保在 Trae IDE 设置中启用了 SOLO Coder
+- **Python 3.8+**：已安装并可在 PATH 中访问
+- **Chrome/Chromium**：已安装最新稳定版本
+- **Git**：用于克隆仓库
+
+#### 步骤 1：在 Trae IDE 中克隆仓库
+
+1. 打开 Trae IDE 并创建一个新的工作区
+2. 使用内置终端克隆仓库：
+   ```bash
+   git clone <repository-url>
+   cd MCPWeChatOfficialAccounts
+   ```
+3. 在 Trae IDE 中打开项目文件夹
+
+#### 步骤 2：为 MCP 配置启用 SOLO Coder
+
+1. 在 Trae IDE 中，导航到 `设置 > 扩展 > SOLO Coder`
+2. 如果尚未启用，请启用 SOLO Coder 扩展
+3. 配置 SOLO Coder 设置：
+   - 将 `Auto-detect MCP servers` 设置为 `Enabled`
+   - 将 `Automate MCP configuration` 设置为 `Enabled`
+   - 确保 `Python interpreter path` 指向您的 Python 3.8+ 安装
+
+#### 步骤 3：使用 SOLO Coder 安装依赖
+
+1. 在项目资源管理器中右键点击 `pyproject.toml` 文件
+2. 选择 `SOLO Coder > Install Python Dependencies`
+3. SOLO Coder 将自动：
+   - 创建虚拟环境（如果尚未存在）
+   - 从 `pyproject.toml` 安装所有必需的依赖
+   - 验证安装是否成功
+
+#### 步骤 4：配置 MCP 服务器设置
+
+1. 在项目资源管理器中右键点击 `config.toml` 文件
+2. 选择 `SOLO Coder > Configure MCP Server`
+3. SOLO Coder 将引导您完成配置过程：
+   - **爬虫设置**：
+     - `headless`：生产环境设置为 `true`，调试时设置为 `false`
+     - `wait_time`：根据您的网络速度调整（默认：10 秒）
+     - `download_images`：设置为 `true` 以下载文章图片
+     - `articles_dir`：保存爬取文章的路径（默认：`articles`）
+     - `images_dir`：保存下载图片的路径（默认：`images`）
+   - **MCP 设置**：
+     - `server_name`：您的 MCP 服务器的唯一标识符
+     - `transport`：设置为 `stdio` 以进行标准 MCP 通信
+     - `debug`：设置为 `true` 以启用详细日志记录
+   - **日志设置**：
+     - `level`：日志级别（`DEBUG`、`INFO`、`WARNING`、`ERROR`）
+     - `file`：日志文件路径（留空以仅在控制台记录）
+
+#### 步骤 5：生成 MCP 配置文件
+
+1. 在 Trae IDE 中，打开命令面板（Ctrl+Shift+P / Cmd+Shift+P）
+2. 输入 `SOLO Coder: Generate MCP Configuration` 并选择它
+3. SOLO Coder 将生成：
+   - `mcp_server_config.yaml`：MCP 服务器配置文件
+   - `launch.json`：VS Code/Trae IDE 启动配置
+   - `tasks.json`：项目的构建和测试任务
+
+#### 步骤 6：验证 MCP 服务器配置
+
+1. 在 Trae IDE 中，打开终端
+2. 运行验证命令：
+   ```bash
+   python -m mcp_weixin_spider verify
+   ```
+3. 检查输出是否有任何错误或警告
+4. 如果验证通过，您将看到类似以下消息：
+   ```text
+   ✅ MCP 服务器配置验证成功！
+   ✅ Selenium WebDriver 工作正常
+   ✅ 检测到 Chrome/Chromium 浏览器
+   ✅ 配置文件有效
+   ```
+
+#### 步骤 7：启动 MCP 服务器
+
+1. 在 Trae IDE 中，打开 `src/mcp_weixin_spider/server.py` 文件
+2. 点击右上角的 "Run" 按钮，或使用以下命令：
+   ```bash
+   python -m mcp_weixin_spider server
+   ```
+3. MCP 服务器应成功启动，并显示：
+   ```text
+   🚀 FastMCP Server starting...
+   📡 Listening for MCP requests on stdio
+   🤖 Ready to serve MCP tools!
+   ```
+
+#### 步骤 8：使用客户端测试 MCP 服务器
+
+1. 在 Trae IDE 中打开一个新终端
+2. 启动 MCP 客户端：
+   ```bash
+   python -m mcp_weixin_spider client
+   ```
+3. 使用交互式客户端测试 MCP 服务器：
+   ```text
+   > help
+   Available tools: crawl_weixin_article, analyze_article, get_article_stats
+   > crawl_weixin_article --url <weixin-article-url>
+   ```
+4. 验证服务器是否返回爬取的文章内容
+
+#### 常见问题排查
+
+| 问题                | 原因                         | 解决方案                                                                                                 |
+| ----------------- | -------------------------- | ---------------------------------------------------------------------------------------------------- |
+| ChromeDriver 未找到  | ChromeDriver 未安装或不在 PATH 中 | SOLO Coder 应自动处理此问题，但您也可以使用以下命令手动安装：`pip install chromedriver-autoinstaller`                         |
+| MCP 服务器启动失败       | 配置错误或缺少依赖                  | 检查错误日志，使用以下命令验证依赖：`pip install -r requirements.txt`，并使用以下命令验证配置：`python -m mcp_weixin_spider verify` |
+| SOLO Coder 未检测到项目 | 项目结构不标准                    | 确保项目根目录包含 `pyproject.toml` 和 `src/` 目录，并重启 Trae IDE                                                  |
+| 客户端连接被拒绝          | 服务器未运行或传输设置不正确             | 验证服务器是否正在运行，检查 config.toml 中的 `transport` 设置是否为 `stdio`                                              |
+| 文章爬取失败            | 网络问题或反爬虫机制                 | 在 config.toml 中增加 `wait_time`，调试时禁用无头模式，或检查文章 URL 是否可访问                                              |
+
+#### SOLO Coder 高级功能
+
+1. **自动生成 MCP 工具**：
+   - 在 `server.py` 中右键点击任何 Python 函数
+   - 选择 `SOLO Coder > Generate MCP Tool Definition`
+   - SOLO Coder 将自动将该函数添加到 MCP 工具注册表
+2. **调试 MCP 服务器**：
+   - 在 `server.py` 中设置断点
+   - 使用生成的 `launch.json` 配置在调试模式下运行服务器
+   - 使用 MCP 客户端发送请求并逐步执行代码
+3. **监控 MCP 流量**：
+   - 在 SOLO Coder 设置中启用 `MCP Traffic Logging`
+   - 在 Trae IDE 控制台中查看实时 MCP 请求/响应流量
+4. **自动更新依赖**：
+   - 在 SOLO Coder 设置中将 `Auto-update dependencies` 设置为 `Enabled`
+   - 当 `pyproject.toml` 更改时，SOLO Coder 将自动更新依赖
 
 ### ⚙️ 配置管理
 

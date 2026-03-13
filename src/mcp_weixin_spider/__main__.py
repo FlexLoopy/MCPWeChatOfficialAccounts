@@ -24,13 +24,13 @@ def main():
         if mode == "client":
             # 启动交互式客户端
             print("🎯 启动MCP微信爬虫客户端")
-            from client import run_client
+            from .client import run_client
             server_path = Path(__file__).parent / "server.py"
             asyncio.run(run_client(str(server_path)))
         elif mode == "server":
             # 启动MCP服务器
             print("🚀 启动MCP微信爬虫服务器")
-            from server import main as server_main
+            from .server import main as server_main
             server_main()
         else:
             print(f"未知模式: {mode}")
