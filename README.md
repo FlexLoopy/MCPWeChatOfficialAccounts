@@ -89,7 +89,7 @@ graph TB
 - 环境变量覆盖机制
 - 类型安全的配置访问
 
-#### 5. Selenium爬虫引擎 (`weixin_spider_simple.py`)
+#### 5. Selenium爬虫引擎 (`weixin_spider.py`)
 
 - Chrome浏览器自动化控制
 - 智能ChromeDriver管理（自动安装和路径检测）
@@ -110,7 +110,7 @@ MCPWeChatOfficialAccounts/
 │       ├── config.py           # 配置管理
 │       ├── main.py             # 主函数
 │       └── server.py           # FastMCP服务器实现
-├── weixin_spider_simple.py     # Selenium爬虫引擎
+├── weixin_spider.py     # Selenium爬虫引擎
 ├── config.toml                 # 主配置文件
 ├── config.toml.example         # 配置文件示例
 ├── pyproject.toml              # 项目元数据和依赖管理
@@ -268,10 +268,10 @@ cd MCPWeChatOfficialAccounts
 pip install -e .[dev]
 
 # 运行代码格式化
-black src/ weixin_spider_simple.py
+black src/ weixin_spider.py
 
 # 运行代码检查
-flake8 src/ weixin_spider_simple.py
+flake8 src/ weixin_spider.py
 
 # 运行类型检查
 mypy src/
